@@ -19,12 +19,12 @@ local function timestamp()
 end
 
 local function findDetector()
-  if config.detector and config.detector.name and fs.exists(config.detector.name) then
-    local ok, p = pcall(peripheral.wrap, config.detector.name)
+  if config.detector and config.detector.name then
+    local ok, p = pcall(function() return peripheral.wrap(config.detector.name) end)
     if ok and p then return p end
   end
-  local ok, p = pcall(peripheral.find, "playerDetector")
-  if ok and p then return p end
+  local ok2, p2 = pcall(function() return peripheral.find("playerDetector") end)
+  if ok2 and p2 then return p2 end
   return nil
 end
 
@@ -36,12 +36,12 @@ local function getPlayerInfo(username)
   local info = nil
   -- try getPlayer (if exists)
   if detector.getPlayer then
-    local ok, res = pcall(detector.getPlayer, detector, username)
+    local ok, res = pcall(function() return detector.getPlayer(username) end)
     if ok and type(res) == "table" then info = res end
   end
   -- fallback to getPlayerPos
   if not info and detector.getPlayerPos then
-    local ok2, res2 = pcall(detector.getPlayerPos, detector, username)
+    local ok2, res2 = pcall(function() return detector.getPlayerPos(username) end)
     if ok2 and type(res2) == "table" then info = res2 end
   end
   return info
@@ -71,7 +71,7 @@ local function buildEmbed(eventType, username, info, extra)
   end
 
   local desc = table.concat(parts, " - ")
-
+  print(desc)
   local embed = { title = title, description = desc, color = (config.remote and config.remote.color) or 3447003 }
   return embed
 end
