@@ -47,24 +47,32 @@ local function getPlayerInfo(username)
   return info
 end
 
-local function buildEmbed(eventType, username, info)
+local function buildEmbed(eventType, username, info, extra)
   local title = string.format("%s — %s", username or "unknown", eventType)
-  local desc = timestamp()
-  if info and info.dimension then desc = desc .. " - " .. tostring(info.dimension) end
-  if info and info.uuid then desc = desc .. " - " .. tostring(info.uuid) end
+  if extra and extra.from and extra.to then
+    title = title .. string.format(" (%s -> %s)", tostring(extra.from), tostring(extra.to))
+  elseif extra and extra.dim then
+    title = title .. string.format(" (%s)", tostring(extra.dim))
+  end
 
-  local embed = { title = title, description = desc, color = (config.remote and config.remote.color) or 3447003 }
+  -- Build description: timestamp, uuid if present, then all getPlayer fields
+  local parts = {}
+  table.insert(parts, timestamp())
+  if info and info.uuid then table.insert(parts, tostring(info.uuid)) end
 
-  -- add fields for useful properties (x,y,z,yaw,pitch,health etc.)
+  -- Preferred ordering of player properties from docs
+  local keys = { "dimension", "eyeHeight", "pitch", "health", "maxHealth", "airSupply", "respawnPosition", "respawnDimension", "respawnAngle", "yaw", "x", "y", "z" }
   if info then
-    local fields = {}
-    for k, v in pairs(info) do
-      if k ~= "uuid" and k ~= "dimension" then
-        table.insert(fields, { name = tostring(k), value = tostring(v), inline = true })
+    for _, k in ipairs(keys) do
+      if info[k] ~= nil then
+        table.insert(parts, string.format("%s: %s", tostring(k), tostring(info[k])))
       end
     end
-    if #fields > 0 then embed.fields = fields end
   end
+
+  local desc = table.concat(parts, " - ")
+
+  local embed = { title = title, description = desc, color = (config.remote and config.remote.color) or 3447003 }
   return embed
 end
 
@@ -86,7 +94,7 @@ local function postWebhook(url, username, avatar_url, embed)
   return true, body or resp
 end
 
-local function sendRemoteForEvent(eventType, username)
+local function sendRemoteForEvent(eventType, username, extra)
   if not config.remote or not config.remote.enabled then return end
   local url = config.remote.webhookURL or ""
   if config.remote.method == "webhook" and (not url or url == "") then
@@ -96,7 +104,7 @@ local function sendRemoteForEvent(eventType, username)
   end
 
   local info = getPlayerInfo(username)
-  local embed = buildEmbed(eventType, username, info)
+  local embed = buildEmbed(eventType, username, info, extra)
   local avatar = "https://mc-heads.net/avatar/" .. (username or "")
   local ok, resp = postWebhook(url, username, avatar, embed)
   if not ok then print("posLogger: webhook post failed: " .. tostring(resp)) end
@@ -109,14 +117,16 @@ while true do
   local name = ev[1]
   if name == "playerJoin" then
     local username = ev[2]
-    sendRemoteForEvent("Join", username)
+    local dim = ev[3]
+    sendRemoteForEvent("Join", username, { dim = dim })
     -- persist local log
     local line = string.format("[%s] JOIN %s", timestamp(), tostring(username))
     local fh = fs.open("/poslogs.log", "a")
     if fh then fh.writeLine(line); fh.close() end
   elseif name == "playerLeave" then
     local username = ev[2]
-    sendRemoteForEvent("Leave", username)
+    local dim = ev[3]
+    sendRemoteForEvent("Leave", username, { dim = dim })
     local line = string.format("[%s] LEAVE %s", timestamp(), tostring(username))
     local fh = fs.open("/poslogs.log", "a")
     if fh then fh.writeLine(line); fh.close() end
@@ -124,7 +134,7 @@ while true do
     local username = ev[2]
     local fromDim = ev[3]
     local toDim = ev[4]
-    sendRemoteForEvent("ChangedDimension", username)
+    sendRemoteForEvent("ChangedDimension", username, { from = fromDim, to = toDim })
     local line = string.format("[%s] DIMCHANGE %s %s -> %s", timestamp(), tostring(username), tostring(fromDim), tostring(toDim))
     local fh = fs.open("/poslogs.log", "a")
     if fh then fh.writeLine(line); fh.close() end
