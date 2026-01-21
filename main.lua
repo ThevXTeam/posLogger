@@ -48,31 +48,53 @@ local function getPlayerInfo(username)
 end
 
 local function buildEmbed(eventType, username, info, extra)
-  local title = string.format("%s — %s", username or "unknown", eventType)
-  if extra and extra.from and extra.to then
-    title = title .. string.format(" (%s -> %s)", tostring(extra.from), tostring(extra.to))
-  elseif extra and extra.dim then
-    title = title .. string.format(" (%s)", tostring(extra.dim))
+  -- Build embed with fields `CURRENT` and `SPAWNPOINT` per requested format
+  info = info or {}
+  local dim = info.dimension or (extra and extra.dim) or "unknown"
+
+  local function numfmt(v)
+    if v == nil then return nil end
+    return tostring(v)
   end
 
-  -- Build description: timestamp, uuid if present, then all getPlayer fields
-  local parts = {}
-  table.insert(parts, timestamp())
-  if info and info.uuid then table.insert(parts, tostring(info.uuid)) end
+  -- CURRENT field value lines
+  local curLines = {}
+  if info.x or info.y or info.z then
+    table.insert(curLines, "x: " .. (numfmt(info.x) or ""))
+    table.insert(curLines, "y: " .. (numfmt(info.y) or ""))
+    table.insert(curLines, "z: " .. (numfmt(info.z) or ""))
+  end
+  if info.yaw ~= nil then table.insert(curLines, "") end
+  if info.yaw ~= nil then table.insert(curLines, "yaw: " .. numfmt(info.yaw)) end
+  if info.pitch ~= nil then table.insert(curLines, "pitch: " .. numfmt(info.pitch)) end
+  if info.eyeHeight ~= nil then table.insert(curLines, "eyeHeight: " .. numfmt(info.eyeHeight)) end
 
-  -- Preferred ordering of player properties from docs
-  local keys = { "dimension", "eyeHeight", "pitch", "health", "maxHealth", "airSupply", "respawnPosition", "respawnDimension", "respawnAngle", "yaw", "x", "y", "z" }
-  if info then
-    for _, k in ipairs(keys) do
-      if info[k] ~= nil then
-        table.insert(parts, string.format("%s: %s", tostring(k), tostring(info[k])))
-      end
-    end
+  -- health/air line
+  local hpLineParts = {}
+  if info.health ~= nil then table.insert(hpLineParts, "hp " .. numfmt(info.health) .. (info.maxHealth and ("/" .. numfmt(info.maxHealth)) or "")) end
+  if info.airSupply ~= nil then table.insert(hpLineParts, "airSupply: " .. numfmt(info.airSupply)) end
+  if #hpLineParts > 0 then
+    table.insert(curLines, "")
+    table.insert(curLines, table.concat(hpLineParts, " "))
   end
 
-  local desc = table.concat(parts, " - ")
-  print(desc)
-  local embed = { title = title, description = desc, color = (config.remote and config.remote.color) or 3447003 }
+  local currentField = { name = ("CURRENT\n" .. tostring(dim)), value = table.concat(curLines, "\n") }
+
+  -- SPAWNPOINT field
+  local spawnLines = {}
+  if info.respawnPosition and type(info.respawnPosition) == "table" then
+    table.insert(spawnLines, "x: " .. numfmt(info.respawnPosition.x))
+    table.insert(spawnLines, "y: " .. numfmt(info.respawnPosition.y))
+    table.insert(spawnLines, "z: " .. numfmt(info.respawnPosition.z))
+  end
+  if info.respawnAngle ~= nil then
+    if #spawnLines > 0 then table.insert(spawnLines, "") end
+    table.insert(spawnLines, "respawnAngle: " .. numfmt(info.respawnAngle))
+  end
+  local spawnDim = info.respawnDimension or "unknown"
+  local spawnField = { name = ("SPAWNPOINT\n" .. tostring(spawnDim)), value = (#spawnLines > 0) and table.concat(spawnLines, "\n") or "" }
+
+  local embed = { color = (config.remote and config.remote.color) or 3447003, fields = { currentField, spawnField } }
   return embed
 end
 
