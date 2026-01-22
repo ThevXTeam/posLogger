@@ -146,7 +146,7 @@ local function sendRemoteForEvent(eventType, username, extra)
     if input and input ~= "" then url = input else return end
   end
 
-  local now = (os.time and os.time()) or nil
+  local now = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock())) or nil
   local prevCache = playerCache[username]
   local info = nil
   local usedCache = false
@@ -164,7 +164,7 @@ local function sendRemoteForEvent(eventType, username, extra)
     -- regular event: fetch live info and update cache if available
     info = getPlayerInfo(username)
     if info and type(info) == "table" then
-      playerCache[username] = { info = info, ts = now }
+      playerCache[username] = { info = info, ts = (now and tonumber(now)) or nil, ts_str = timestamp() }
     end
   end
 
@@ -174,11 +174,10 @@ local function sendRemoteForEvent(eventType, username, extra)
   if eventType == "Leave" then
     embed.title = "Left server"
     local cacheEntry = prevCache or playerCache[username]
-    if cacheEntry and cacheEntry.ts then
-      local ts = cacheEntry.ts
-      local tsStr = (os.date and os.date("%Y-%m-%d - %H:%M:%S", ts)) or tostring(ts)
-      local age = now and (now - ts) or nil
-      if age then
+    if cacheEntry and ((cacheEntry.ts and cacheEntry.ts > 0) or cacheEntry.ts_str) then
+      local tsStr = cacheEntry.ts_str or ((cacheEntry.ts and (os.date and os.date("%Y-%m-%d - %H:%M:%S", cacheEntry.ts))) or tostring(cacheEntry.ts))
+      local age = (now and cacheEntry.ts) and (now - cacheEntry.ts) or nil
+      if age and age >= 0 then
         embed.description = string.format("information from %s (%ds before leave)", tsStr, age)
       else
         embed.description = string.format("information from %s", tsStr)
