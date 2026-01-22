@@ -146,17 +146,25 @@ local function sendRemoteForEvent(eventType, username, extra)
     if input and input ~= "" then url = input else return end
   end
 
-  local info = getPlayerInfo(username)
   local now = (os.time and os.time()) or nil
   local prevCache = playerCache[username]
+  local info = nil
+  local usedCache = false
 
-  if info and type(info) == "table" then
-    -- update cache with fresh info
-    playerCache[username] = { info = info, ts = now }
-  else
-    -- if we couldn't fetch live info (likely on leave), try cached value
-    if eventType == "Leave" and prevCache and prevCache.info then
+  if eventType == "Leave" then
+    -- prefer cached info for Leave events
+    if prevCache and prevCache.info then
       info = prevCache.info
+      usedCache = true
+    else
+      -- fallback to live info if no cache
+      info = getPlayerInfo(username)
+    end
+  else
+    -- regular event: fetch live info and update cache if available
+    info = getPlayerInfo(username)
+    if info and type(info) == "table" then
+      playerCache[username] = { info = info, ts = now }
     end
   end
 
