@@ -7,6 +7,7 @@ return {
     webhookURL = "",
     color = 3447003,
     flags = 4096,
+    joinDelay = 3,
   },
 
   -- Player detector preferences

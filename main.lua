@@ -133,6 +133,12 @@ local function sendRemoteForEvent(eventType, username, extra)
     if input and input ~= "" then url = input else return end
   end
 
+  -- For Join events, wait briefly so the player connection info becomes available
+  if eventType == "Join" then
+    local delay = (config.remote and config.remote.joinDelay) or 2
+    if delay and delay > 0 then os.sleep(delay) end
+  end
+
   local info = getPlayerInfo(username)
   local embed = buildEmbed(eventType, username, info, extra)
   local avatar = "https://mc-heads.net/avatar/" .. (username or "")
