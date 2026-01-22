@@ -48,16 +48,27 @@ local function getPlayerInfo(username)
 end
 
 local function buildEmbed(eventType, username, info, extra)
-  -- Build embed with fields `CURRENT` and `SPAWNPOINT` per requested format
   info = info or {}
-  local dim = info.dimension or (extra and extra.dim) or "unknown"
-
   local function numfmt(v)
     if v == nil then return nil end
     return tostring(v)
   end
 
-  -- CURRENT field value lines
+  if eventType == "ChangedDimension" then
+    local from = tostring(extra and extra.from or info.dimension or "unknown")
+    local to = tostring(extra and extra.to or info.dimension or "unknown")
+    local title = "Change Dimension"
+    local desc = string.format("%s -> %s", from, to)
+    return { title = title, description = desc, color = (config.remote and config.remote.color) or 3447003 }
+  end
+
+  if eventType == "Join" then
+    return { title = "Joined server", color = (config.remote and config.remote.color) or 3447003 }
+  end
+
+  -- Default/Leave: build CURRENT and SPAWNPOINT fields
+  local dim = info.dimension or (extra and extra.dim) or "unknown"
+
   local curLines = {}
   if info.x or info.y or info.z then
     table.insert(curLines, "x: " .. (numfmt(info.x) or ""))
@@ -69,7 +80,6 @@ local function buildEmbed(eventType, username, info, extra)
   if info.pitch ~= nil then table.insert(curLines, "pitch: " .. numfmt(info.pitch)) end
   if info.eyeHeight ~= nil then table.insert(curLines, "eyeHeight: " .. numfmt(info.eyeHeight)) end
 
-  -- health/air line
   local hpLineParts = {}
   if info.health ~= nil then table.insert(hpLineParts, "hp " .. numfmt(info.health) .. (info.maxHealth and ("/" .. numfmt(info.maxHealth)) or "")) end
   if info.airSupply ~= nil then table.insert(hpLineParts, "airSupply: " .. numfmt(info.airSupply)) end
@@ -80,7 +90,6 @@ local function buildEmbed(eventType, username, info, extra)
 
   local currentField = { name = ("CURRENT\n" .. tostring(dim)), value = table.concat(curLines, "\n") }
 
-  -- SPAWNPOINT field
   local spawnLines = {}
   if info.respawnPosition and type(info.respawnPosition) == "table" then
     table.insert(spawnLines, "x: " .. numfmt(info.respawnPosition.x))
@@ -94,8 +103,7 @@ local function buildEmbed(eventType, username, info, extra)
   local spawnDim = info.respawnDimension or "unknown"
   local spawnField = { name = ("SPAWNPOINT\n" .. tostring(spawnDim)), value = (#spawnLines > 0) and table.concat(spawnLines, "\n") or "" }
 
-  local embed = { color = (config.remote and config.remote.color) or 3447003, fields = { currentField, spawnField } }
-  return embed
+  return { color = (config.remote and config.remote.color) or 3447003, fields = { currentField, spawnField } }
 end
 
 local function postWebhook(url, username, avatar_url, embed)
