@@ -54,19 +54,7 @@ local function buildEmbed(eventType, username, info, extra)
     return tostring(v)
   end
 
-  if eventType == "ChangedDimension" then
-    local from = tostring(extra and extra.from or info.dimension or "unknown")
-    local to = tostring(extra and extra.to or info.dimension or "unknown")
-    local title = "Change Dimension"
-    local desc = string.format("%s -> %s", from, to)
-    return { title = title, description = desc, color = (config.remote and config.remote.color) or 3447003 }
-  end
-
-  if eventType == "Join" then
-    return { title = "Joined server", color = (config.remote and config.remote.color) or 3447003 }
-  end
-
-  -- Default/Leave: build CURRENT and SPAWNPOINT fields
+  -- Build CURRENT and SPAWNPOINT fields (always present)
   local dim = info.dimension or (extra and extra.dim) or "unknown"
 
   local curLines = {}
@@ -103,7 +91,19 @@ local function buildEmbed(eventType, username, info, extra)
   local spawnDim = info.respawnDimension or "unknown"
   local spawnField = { name = ("SPAWNPOINT\n" .. tostring(spawnDim)), value = (#spawnLines > 0) and table.concat(spawnLines, "\n") or "" }
 
-  return { color = (config.remote and config.remote.color) or 3447003, fields = { currentField, spawnField } }
+  local embed = { color = (config.remote and config.remote.color) or 3447003, fields = { currentField, spawnField } }
+
+  -- Add event-specific title/description without skipping fields
+  if eventType == "ChangedDimension" then
+    local from = tostring(extra and extra.from or info.dimension or "unknown")
+    local to = tostring(extra and extra.to or info.dimension or "unknown")
+    embed.title = "Change Dimension"
+    embed.description = string.format("%s -> %s", from, to)
+  elseif eventType == "Join" then
+    embed.title = "Joined server"
+  end
+
+  return embed
 end
 
 local function postWebhook(url, username, avatar_url, embed)
@@ -133,11 +133,7 @@ local function sendRemoteForEvent(eventType, username, extra)
     if input and input ~= "" then url = input else return end
   end
 
-  -- For Join events, wait briefly so the player connection info becomes available
-  if eventType == "Join" then
-    local delay = (config.remote and config.remote.joinDelay) or 2
-    if delay and delay > 0 then os.sleep(delay) end
-  end
+  -- (no artificial delay here)
 
   local info = getPlayerInfo(username)
   local embed = buildEmbed(eventType, username, info, extra)
