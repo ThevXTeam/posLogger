@@ -6,6 +6,10 @@ return {
     method = "webhook",
     webhookURL = "",
     color = 3447003,
+    -- Per-event colors (can override `color` when sending event embeds)
+    joinColor = 3066993,       -- green-ish for joins
+    leaveColor = 15158332,     -- red-ish for leaves
+    changeDimColor = 10181046, -- purple-ish for dimension changes
     flags = 4096,
   },
 

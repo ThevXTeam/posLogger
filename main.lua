@@ -91,7 +91,17 @@ local function buildEmbed(eventType, username, info, extra)
   local spawnDim = info.respawnDimension or "unknown"
   local spawnField = { name = ("SPAWNPOINT\n" .. tostring(spawnDim)), value = (#spawnLines > 0) and table.concat(spawnLines, "\n") or "" }
 
-  local embed = { color = (config.remote and config.remote.color) or 3447003, fields = { currentField, spawnField } }
+  local baseColor = (config.remote and config.remote.color) or 3447003
+  local evtColor = baseColor
+  if eventType == "Join" then
+    evtColor = (config.remote and config.remote.joinColor) or baseColor
+  elseif eventType == "Leave" then
+    evtColor = (config.remote and config.remote.leaveColor) or baseColor
+  elseif eventType == "ChangedDimension" then
+    evtColor = (config.remote and config.remote.changeDimColor) or baseColor
+  end
+
+  local embed = { color = evtColor, fields = { currentField, spawnField } }
 
   -- Add event-specific title/description without skipping fields
   if eventType == "ChangedDimension" then
