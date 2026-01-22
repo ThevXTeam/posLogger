@@ -31,6 +31,9 @@ end
 local detector = findDetector()
 if not detector then print("posLogger: no playerDetector peripheral found; events will still be handled but player details may be unavailable") end
 
+-- cache last-seen player info so we can report it on leave events
+local playerCache = {}
+
 local function getPlayerInfo(username)
   if not detector then return nil end
   local info = nil
@@ -143,13 +146,46 @@ local function sendRemoteForEvent(eventType, username, extra)
     if input and input ~= "" then url = input else return end
   end
 
-  -- (no artificial delay here)
-
   local info = getPlayerInfo(username)
+  local now = (os.time and os.time()) or nil
+  local prevCache = playerCache[username]
+
+  if info and type(info) == "table" then
+    -- update cache with fresh info
+    playerCache[username] = { info = info, ts = now }
+  else
+    -- if we couldn't fetch live info (likely on leave), try cached value
+    if eventType == "Leave" and prevCache and prevCache.info then
+      info = prevCache.info
+    end
+  end
+
   local embed = buildEmbed(eventType, username, info, extra)
+
+  -- For Leave events, set title and description that reference cached timestamp
+  if eventType == "Leave" then
+    embed.title = "Left server"
+    local cacheEntry = prevCache or playerCache[username]
+    if cacheEntry and cacheEntry.ts then
+      local ts = cacheEntry.ts
+      local tsStr = (os.date and os.date("%Y-%m-%d - %H:%M:%S", ts)) or tostring(ts)
+      local age = now and (now - ts) or nil
+      if age then
+        embed.description = string.format("information from %s (%ds before leave)", tsStr, age)
+      else
+        embed.description = string.format("information from %s", tsStr)
+      end
+    else
+      embed.description = "no prior information available"
+    end
+  end
+
   local avatar = "https://mc-heads.net/avatar/" .. (username or "")
   local ok, resp = postWebhook(url, username, avatar, embed)
   if not ok then print("posLogger: webhook post failed: " .. tostring(resp)) end
+
+  -- cleanup cache on leave
+  if eventType == "Leave" then playerCache[username] = nil end
 end
 
 print("posLogger running; listening for playerJoin/playerLeave/playerChangedDimension events")
