@@ -35,17 +35,13 @@ if not detector then print("posLogger: no playerDetector peripheral found; event
 local playerCache = {}
 
 -- tracker timer id (if tracker enabled)
-local trackerTimerId = nil
 local trackerInterval = nil
 local trackedPlayers = nil
 
--- initialize tracker if configured
-if config.tracker and config.tracker.enabled and type(os.startTimer) == "function" then
+-- initialize tracker config (do not start timers here; trackerLoop will manage sleeping)
+if config.tracker and config.tracker.enabled then
   trackerInterval = tonumber(config.tracker.interval) or 1
   trackedPlayers = config.tracker.players or {}
-  if trackerInterval > 0 then
-    trackerTimerId = os.startTimer(trackerInterval)
-  end
 end
 
 local function getPlayerInfo(username)
@@ -204,54 +200,78 @@ end
 
 print("posLogger running; listening for playerJoin/playerLeave/playerChangedDimension events")
 
-while true do
-  local ev = { os.pullEvent() }
-  local name = ev[1]
-  -- handle tracker timer
-  if name == "timer" and trackerTimerId and ev[2] == trackerTimerId then
-    -- poll tracked players
-    print("track players :")
+-- Event loop (handles incoming player events)
+local function eventLoop()
+  while true do
+    local ev = { os.pullEvent() }
+    local name = ev[1]
+    if name == "playerJoin" then
+      local username = ev[2]
+      local dim = ev[3]
+      local evTs = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
+      sendRemoteForEvent("Join", username, { dim = dim }, evTs, timestamp())
+      local line = string.format("[%s] JOIN %s", timestamp(), tostring(username))
+      local fh = fs.open("/poslogs.log", "a")
+      if fh then fh.writeLine(line); fh.close() end
+    elseif name == "playerLeave" then
+      local username = ev[2]
+      local dim = ev[3]
+      local evTs = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
+      sendRemoteForEvent("Leave", username, { dim = dim }, evTs, timestamp())
+      local line = string.format("[%s] LEAVE %s", timestamp(), tostring(username))
+      local fh = fs.open("/poslogs.log", "a")
+      if fh then fh.writeLine(line); fh.close() end
+    elseif name == "playerChangedDimension" then
+      local username = ev[2]
+      local fromDim = ev[3]
+      local toDim = ev[4]
+      local evTs = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
+      sendRemoteForEvent("ChangedDimension", username, { from = fromDim, to = toDim }, evTs, timestamp())
+      local line = string.format("[%s] DIMCHANGE %s %s -> %s", timestamp(), tostring(username), tostring(fromDim), tostring(toDim))
+      local fh = fs.open("/poslogs.log", "a")
+      if fh then fh.writeLine(line); fh.close() end
+    end
+  end
+end
+
+-- Tracker loop (polls configured players on interval)
+local function trackerLoop()
+  if not (config.tracker and config.tracker.enabled and trackerInterval and trackerInterval > 0 and trackedPlayers and #trackedPlayers > 0) then
+    -- nothing to track; sleep indefinitely but keep coroutine alive
+    while true do
+      if type(os.sleep) == "function" then os.sleep(10) else os.pullEvent("timer") end
+    end
+  end
+
+  while true do
+    if type(os.sleep) == "function" then
+      os.sleep(trackerInterval)
+    else
+      local t = os.startTimer(trackerInterval)
+      local _, id = os.pullEvent("timer")
+      if id ~= t then
+        -- continue waiting until expected timer fires
+        goto continue_wait
+      end
+    end
+    ::continue_wait::
+
     if trackedPlayers and #trackedPlayers > 0 then
-      for _,pname in ipairs(trackedPlayers) do
-        print("- "..pname)
+      for _, pname in ipairs(trackedPlayers) do
         local ok, info = pcall(getPlayerInfo, pname)
+        local now_ts = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
         if ok and type(info) == "table" then
-          local now_ts = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
           playerCache[pname] = { info = info, ts = (now_ts and tonumber(now_ts)) or nil, ts_str = timestamp() }
-          print("cached player at " .. tostring(now_ts))
-        else
-          print("couldn't get player info at " .. tostring(now_ts))  
         end
       end
     end
-    -- restart timer
-    if trackerInterval and trackerInterval > 0 then trackerTimerId = os.startTimer(trackerInterval) end
   end
-  if name == "playerJoin" then
-    local username = ev[2]
-    local dim = ev[3]
-    local evTs = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
-    sendRemoteForEvent("Join", username, { dim = dim }, evTs, timestamp())
-    -- persist local log
-    local line = string.format("[%s] JOIN %s", timestamp(), tostring(username))
-    local fh = fs.open("/poslogs.log", "a")
-    if fh then fh.writeLine(line); fh.close() end
-  elseif name == "playerLeave" then
-    local username = ev[2]
-    local dim = ev[3]
-    local evTs = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
-    sendRemoteForEvent("Leave", username, { dim = dim }, evTs, timestamp())
-    local line = string.format("[%s] LEAVE %s", timestamp(), tostring(username))
-    local fh = fs.open("/poslogs.log", "a")
-    if fh then fh.writeLine(line); fh.close() end
-  elseif name == "playerChangedDimension" then
-    local username = ev[2]
-    local fromDim = ev[3]
-    local toDim = ev[4]
-    local evTs = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
-    sendRemoteForEvent("ChangedDimension", username, { from = fromDim, to = toDim }, evTs, timestamp())
-    local line = string.format("[%s] DIMCHANGE %s %s -> %s", timestamp(), tostring(username), tostring(fromDim), tostring(toDim))
-    local fh = fs.open("/poslogs.log", "a")
-    if fh then fh.writeLine(line); fh.close() end
-  end
+end
+
+-- Run event and tracker loops concurrently when `parallel.waitForAny` is available.
+if parallel and type(parallel.waitForAny) == "function" then
+  parallel.waitForAny(eventLoop, trackerLoop)
+else
+  -- fallback: run event loop only (tracker will not run concurrently)
+  eventLoop()
 end
