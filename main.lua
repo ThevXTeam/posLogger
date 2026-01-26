@@ -219,6 +219,8 @@ while true do
           local now_ts = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
           playerCache[pname] = { info = info, ts = (now_ts and tonumber(now_ts)) or nil, ts_str = timestamp() }
           print("cached player at " .. tostring(now_ts))
+        else
+          print("couldn't get player info at " .. tostring(now_ts))  
         end
       end
     end
