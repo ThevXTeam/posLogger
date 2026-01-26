@@ -210,13 +210,15 @@ while true do
   -- handle tracker timer
   if name == "timer" and trackerTimerId and ev[2] == trackerTimerId then
     -- poll tracked players
+    print("track players :")
     if trackedPlayers and #trackedPlayers > 0 then
       for _,pname in ipairs(trackedPlayers) do
+        print("- "..pname)
         local ok, info = pcall(getPlayerInfo, pname)
         if ok and type(info) == "table" then
           local now_ts = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
           playerCache[pname] = { info = info, ts = (now_ts and tonumber(now_ts)) or nil, ts_str = timestamp() }
-          print("cached player " .. tostring(pname) .. " at " .. tostring(now_ts))
+          print("cached player at " .. tostring(now_ts))
         end
       end
     end
