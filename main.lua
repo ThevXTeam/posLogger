@@ -174,10 +174,6 @@ local function sendRemoteForEvent(eventType, username, extra, eventTsNum, eventT
     local cacheEntry = prevCache or playerCache[username]
     if cacheEntry and ((cacheEntry.ts and cacheEntry.ts > 0) or cacheEntry.ts_str) then
       local tsStr = cacheEntry.ts_str or ((cacheEntry.ts and (os.date and os.date("%Y-%m-%d - %H:%M:%S", cacheEntry.ts))) or tostring(cacheEntry.ts))
-      local age = (now and cacheEntry.ts) and (now - cacheEntry.ts) or nil
-      if age and age >= 1 then
-        embed.description = string.format("information from %s (%ds before leave)", tsStr, age)
-      else
         embed.description = string.format("information from %s", tsStr)
       end
     else
