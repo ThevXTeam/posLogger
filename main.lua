@@ -34,6 +34,20 @@ if not detector then print("posLogger: no playerDetector peripheral found; event
 -- cache last-seen player info so we can report it on leave events
 local playerCache = {}
 
+-- tracker timer id (if tracker enabled)
+local trackerTimerId = nil
+local trackerInterval = nil
+local trackedPlayers = nil
+
+-- initialize tracker if configured
+if config.tracker and config.tracker.enabled and type(os.startTimer) == "function" then
+  trackerInterval = tonumber(config.tracker.interval) or 1
+  trackedPlayers = config.tracker.players or {}
+  if trackerInterval > 0 then
+    trackerTimerId = os.startTimer(trackerInterval)
+  end
+end
+
 local function getPlayerInfo(username)
   if not detector then return nil end
   local info = nil
@@ -194,6 +208,21 @@ print("posLogger running; listening for playerJoin/playerLeave/playerChangedDime
 while true do
   local ev = { os.pullEvent() }
   local name = ev[1]
+  -- handle tracker timer
+  if name == "timer" and trackerTimerId and ev[2] == trackerTimerId then
+    -- poll tracked players
+    if trackedPlayers and #trackedPlayers > 0 then
+      for _,pname in ipairs(trackedPlayers) do
+        local ok, info = pcall(getPlayerInfo, pname)
+        if ok and type(info) == "table" then
+          local now_ts = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
+          playerCache[pname] = { info = info, ts = (now_ts and tonumber(now_ts)) or nil, ts_str = timestamp() }
+        end
+      end
+    end
+    -- restart timer
+    if trackerInterval and trackerInterval > 0 then trackerTimerId = os.startTimer(trackerInterval) end
+  end
   if name == "playerJoin" then
     local username = ev[2]
     local dim = ev[3]

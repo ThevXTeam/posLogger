@@ -18,4 +18,11 @@ return {
     -- optional: prefer a specific peripheral name (nil to auto-find)
     name = nil,
   }
+  ,
+  -- Optional tracker: periodically poll specific players and keep their info cached
+  tracker = {
+    enabled = false,
+    players = {},
+    interval = 1, -- seconds between polls
+  }
 }
