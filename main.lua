@@ -106,16 +106,6 @@ local function buildEmbed(eventType, username, info, extra)
 
   local embed = { color = evtColor, fields = { currentField, spawnField } }
 
-  -- Add event-specific title/description without skipping fields
-  if eventType == "ChangedDimension" then
-    local from = tostring(extra and extra.from or info.dimension or "unknown")
-    local to = tostring(extra and extra.to or info.dimension or "unknown")
-    embed.title = "Change Dimension"
-    embed.description = string.format("%s -> %s", from, to)
-  elseif eventType == "Join" then
-    embed.title = "Joined server"
-  end
-
   return embed
 end
 
@@ -171,14 +161,21 @@ local function sendRemoteForEvent(eventType, username, extra, eventTsNum, eventT
 
   local embed = buildEmbed(eventType, username, info, extra)
 
-  -- For Leave events, set title and description that reference cached timestamp
-  if eventType == "Leave" then
+  -- set event titles with the exact event timestamp (eventTimeStr)
+  if eventType == "ChangedDimension" then
+    embed.title = string.format("Change Dimension at %s", eventTimeStr)
+    local from = tostring(extra and extra.from or info.dimension or "unknown")
+    local to = tostring(extra and extra.to or info.dimension or "unknown")
+    embed.description = string.format("%s -> %s", from, to)
+  elseif eventType == "Join" then
+    embed.title = string.format("Joined server at %s", eventTimeStr)
+  elseif eventType == "Leave" then
     embed.title = string.format("Left server at %s", eventTimeStr)
     local cacheEntry = prevCache or playerCache[username]
     if cacheEntry and ((cacheEntry.ts and cacheEntry.ts > 0) or cacheEntry.ts_str) then
       local tsStr = cacheEntry.ts_str or ((cacheEntry.ts and (os.date and os.date("%Y-%m-%d - %H:%M:%S", cacheEntry.ts))) or tostring(cacheEntry.ts))
       local age = (now and cacheEntry.ts) and (now - cacheEntry.ts) or nil
-      if age and age >= 0 then
+      if age and age >= 1 then
         embed.description = string.format("information from %s (%ds before leave)", tsStr, age)
       else
         embed.description = string.format("information from %s", tsStr)
