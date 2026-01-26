@@ -137,7 +137,7 @@ local function postWebhook(url, username, avatar_url, embed)
   return true, body or resp
 end
 
-local function sendRemoteForEvent(eventType, username, extra)
+local function sendRemoteForEvent(eventType, username, extra, eventTsNum, eventTsStr)
   if not config.remote or not config.remote.enabled then return end
   local url = config.remote.webhookURL or ""
   if config.remote.method == "webhook" and (not url or url == "") then
@@ -146,7 +146,8 @@ local function sendRemoteForEvent(eventType, username, extra)
     if input and input ~= "" then url = input else return end
   end
 
-  local now = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock())) or nil
+  local now = eventTsNum or ((type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock())))
+  local eventTimeStr = eventTsStr or timestamp()
   local prevCache = playerCache[username]
   local info = nil
   local usedCache = false
@@ -172,7 +173,7 @@ local function sendRemoteForEvent(eventType, username, extra)
 
   -- For Leave events, set title and description that reference cached timestamp
   if eventType == "Leave" then
-    embed.title = "Left server"
+    embed.title = string.format("Left server at %s", eventTimeStr)
     local cacheEntry = prevCache or playerCache[username]
     if cacheEntry and ((cacheEntry.ts and cacheEntry.ts > 0) or cacheEntry.ts_str) then
       local tsStr = cacheEntry.ts_str or ((cacheEntry.ts and (os.date and os.date("%Y-%m-%d - %H:%M:%S", cacheEntry.ts))) or tostring(cacheEntry.ts))
@@ -203,7 +204,8 @@ while true do
   if name == "playerJoin" then
     local username = ev[2]
     local dim = ev[3]
-    sendRemoteForEvent("Join", username, { dim = dim })
+    local evTs = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
+    sendRemoteForEvent("Join", username, { dim = dim }, evTs, timestamp())
     -- persist local log
     local line = string.format("[%s] JOIN %s", timestamp(), tostring(username))
     local fh = fs.open("/poslogs.log", "a")
@@ -211,7 +213,8 @@ while true do
   elseif name == "playerLeave" then
     local username = ev[2]
     local dim = ev[3]
-    sendRemoteForEvent("Leave", username, { dim = dim })
+    local evTs = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
+    sendRemoteForEvent("Leave", username, { dim = dim }, evTs, timestamp())
     local line = string.format("[%s] LEAVE %s", timestamp(), tostring(username))
     local fh = fs.open("/poslogs.log", "a")
     if fh then fh.writeLine(line); fh.close() end
@@ -219,7 +222,8 @@ while true do
     local username = ev[2]
     local fromDim = ev[3]
     local toDim = ev[4]
-    sendRemoteForEvent("ChangedDimension", username, { from = fromDim, to = toDim })
+    local evTs = (type(os.time) == "function" and os.time()) or (type(os.clock) == "function" and math.floor(os.clock()))
+    sendRemoteForEvent("ChangedDimension", username, { from = fromDim, to = toDim }, evTs, timestamp())
     local line = string.format("[%s] DIMCHANGE %s %s -> %s", timestamp(), tostring(username), tostring(fromDim), tostring(toDim))
     local fh = fs.open("/poslogs.log", "a")
     if fh then fh.writeLine(line); fh.close() end
