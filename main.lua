@@ -189,7 +189,6 @@ local function sendRemoteForEvent(eventType, username, extra, eventTsNum, eventT
     if cacheEntry and ((cacheEntry.ts and cacheEntry.ts > 0) or cacheEntry.ts_str) then
       local tsStr = cacheEntry.ts_str or ((cacheEntry.ts and (os.date and os.date("%Y-%m-%d - %H:%M:%S", cacheEntry.ts))) or tostring(cacheEntry.ts))
         embed.description = string.format("information from %s", tsStr)
-      end
     else
       embed.description = "no prior information available"
     end
