@@ -198,8 +198,8 @@ local function sendRemoteForEvent(eventType, username, extra, eventTsNum, eventT
   if eventType == "Leave" then playerCache[username] = nil end
 end
 
-print("posLogger running; listening for playerJoin/playerLeave/playerChangedDimension events")
-
+-- print("posLogger running; listening for playerJoin/playerLeave/playerChangedDimension events")
+print("Program PL running...")
 -- Event loop (handles incoming player events)
 local function eventLoop()
   while true do
